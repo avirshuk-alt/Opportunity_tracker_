@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+@layer base {
+  :root {
+    /* Page & surface */
+    --background: 30 15% 96%;
+    --foreground: 220 20% 12%;
+    --card: 30 10% 99.5%;
+    --card-foreground: 220 20% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 12%;
+
+    /* Brand orange: used sparingly for primary actions */
+    --primary: 22 92% 52%;
+    --primary-foreground: 0 0% 100%;
+
+    /* Warm neutrals */
+    --secondary: 30 8% 93%;
+    --secondary-foreground: 220 14% 20%;
+    --muted: 30 8% 94%;
+    --muted-foreground: 220 10% 44%;
+
+    /* Deeper burnt-orange for accent emphasis */
+    --accent: 14 72% 40%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 62% 48%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Softer borders - rely more on shadow for depth */
+    --border: 30 10% 90%;
+    --input: 30 12% 89%;
+    --ring: 22 92% 52%;
+
+    /* Charts: warm orange / charcoal / burnt red / amber / teal accent */
+    --chart-1: 22 92% 52%;
+    --chart-2: 220 18% 22%;
+    --chart-3: 14 72% 40%;
+    --chart-4: 36 82% 54%;
+    --chart-5: 190 45% 40%;
+
+    --radius: 0.5rem;
+
+    /* Sidebar: deep charcoal */
+    --sidebar-background: 222 22% 10%;
+    --sidebar-foreground: 220 10% 62%;
+    --sidebar-primary: 22 92% 52%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 222 16% 15%;
+    --sidebar-accent-foreground: 30 8% 88%;
+    --sidebar-border: 222 14% 17%;
+    --sidebar-ring: 22 92% 52%;
+
+    /* Semantic */
+    --warning: 38 90% 50%;
+    --warning-foreground: 0 0% 100%;
+    --success: 155 50% 36%;
+    --success-foreground: 0 0% 100%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+  /* Global card elevation: softer border + subtle lift */
+  .border {
+    border-color: hsl(var(--border));
+  }
+}

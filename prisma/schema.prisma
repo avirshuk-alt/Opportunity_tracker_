@@ -1,0 +1,446 @@
+// Opportunity Tracker — Prisma schema (PostgreSQL)
+// See docs/DOMAIN-MODEL.md for entity definitions and relationships.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ─────────────────────────────────────────────────────────────────
+
+enum Role {
+  admin
+  contributor
+  viewer
+}
+
+enum StrategyStatus {
+  Draft
+  InReview
+  Approved
+}
+
+enum InitiativeLifecycle {
+  Draft
+  UnderReview
+  Approved
+  InExecution
+  Completed
+  Archived
+}
+
+enum InitiativeStage {
+  Idea
+  Qualify
+  Source
+  Contract
+  Implement
+  Realize
+}
+
+enum RiskStatus {
+  Open
+  Mitigating
+  Accepted
+  Closed
+}
+
+enum RiskScope {
+  Supplier
+  Category
+  Material
+}
+
+enum RAG {
+  Red
+  Amber
+  Green
+}
+
+enum BenefitType {
+  Hard
+  Soft
+  Avoidance
+}
+
+enum RequirementDriver {
+  Cost
+  Risk
+  Growth
+  Compliance
+  Resilience
+  Sustainability
+}
+
+enum RequirementPriority {
+  Must
+  Should
+  Could
+}
+
+enum RequirementStatus {
+  Proposed
+  Validated
+  Approved
+}
+
+enum ContractStatus {
+  Active
+  Expiring
+  Expired
+  UnderReview
+}
+
+enum SupplierSegment {
+  Strategic
+  Preferred
+  Approved
+  Transactional
+  PhaseOut
+}
+
+enum AuditAction {
+  Create
+  Update
+  Delete
+  Approve
+  Reject
+}
+
+enum NotificationType {
+  reminder
+  approval
+  renewal
+  alert
+}
+
+// ─── Organization & Users ──────────────────────────────────────────────────
+
+model Organization {
+  id            String   @id @default(cuid())
+  name          String
+  businessUnits String[] @default([])
+  regions       String[] @default([])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  users      User[]
+  categories Category[]
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  role      Role     @default(contributor)
+  avatarUrl String?
+  orgId     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  org         Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  categories  Category[]     @relation("CategoryOwner")
+  strategies  Strategy[]
+  initiatives Initiative[]
+  risks       Risk[]
+  auditEvents AuditEvent[]
+  notifications Notification[]
+}
+
+// ─── Category & Strategy ────────────────────────────────────────────────────
+
+model Category {
+  id              String         @id @default(cuid())
+  organizationId  String
+  name            String
+  taxonomyPath    String
+  ownerId         String
+  totalSpend      Float          @default(0)
+  supplierCount   Int            @default(0)
+  contractCount   Int            @default(0)
+  riskScore       Float          @default(0)
+  strategyStatus  StrategyStatus @default(Draft)
+  lastRefreshAt   DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  owner       User         @relation("CategoryOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  strategy    Strategy?
+  initiatives Initiative[]
+  risks       Risk[]
+  kpis        KPI[]
+  suppliers   CategorySupplier[]
+  requirements BusinessRequirement[]
+  objectives  Objective[]
+  contracts   Contract[]
+}
+
+model Strategy {
+  id                String         @id @default(cuid())
+  categoryId         String         @unique
+  version           Int            @default(1)
+  status            StrategyStatus @default(Draft)
+  title             String
+  objectives        String[]       @default([])
+  narrative         Json           // { executiveSummary, currentState, futureState, approach, risks, timeline }
+  assumptions       Json           @default("[]") // [{ id, text, owner, date, status }]
+  decisionLog       Json           @default("[]") // [{ id, decision, rationale, decidedBy, date }]
+  refreshCadenceDays Int           @default(90)
+  lastRefreshAt     DateTime?
+  ownerId           String
+  completionPct     Int            @default(0)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  category    Category     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  owner       User         @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  initiatives Initiative[]
+}
+
+// ─── Initiative (Opportunity) ────────────────────────────────────────────────
+
+model Initiative {
+  id          String            @id @default(cuid())
+  title       String
+  categoryId  String
+  strategyId  String?
+  lifecycle   InitiativeLifecycle @default(Draft)
+  stage       InitiativeStage   @default(Idea)
+  baseline    Float             @default(0)
+  targetSavings Float           @default(0)
+  confidence  Int               @default(0) // 0-100
+  effort      String            // "Low" | "Medium" | "High"
+  ownerId     String
+  description String            @default("")
+  compositeScore Float?         // computed opportunity score
+  scoreBreakdown  Json?         // { financial, strategic, risk, esg, feasibility }
+  dependencyIds   String[]       @default([]) // initiative ids
+  stakeholderIds  String[]      @default([]) // user ids
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  deletedAt   DateTime?
+
+  category   Category      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  strategy   Strategy?     @relation(fields: [strategyId], references: [id], onDelete: SetNull)
+  owner      User          @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  benefits   Benefit[]
+  roadmapItems RoadmapItem[]
+  riskLinks  InitiativeRisk[]
+}
+
+model Benefit {
+  id                String   @id @default(cuid())
+  initiativeId      String
+  type              BenefitType
+  amount            Float    @default(0)
+  timingCurve       Json     @default("[]") // [{ month, amount }]
+  realizationStatus String  // "Forecasted" | "InProgress" | "Realized" | "AtRisk"
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  initiative Initiative @relation(fields: [initiativeId], references: [id], onDelete: Cascade)
+}
+
+// ─── Risk ───────────────────────────────────────────────────────────────────
+
+model Risk {
+  id                 String     @id @default(cuid())
+  title              String
+  scope              RiskScope
+  categoryId         String?
+  supplierId         String?
+  likelihood         Int        // 1-5
+  impact             Int        // 1-5
+  detectability      Int        // 1-5
+  riskScore          Int        // computed
+  appetiteThreshold  Int
+  status             RiskStatus @default(Open)
+  ownerId            String
+  acceptedRationale  String?
+  mitigationPlan     String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  deletedAt          DateTime?
+
+  category   Category?  @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  supplier   Supplier?  @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  owner      User       @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  initiatives InitiativeRisk[]
+}
+
+model InitiativeRisk {
+  initiativeId String
+  riskId       String
+
+  initiative Initiative @relation(fields: [initiativeId], references: [id], onDelete: Cascade)
+  risk       Risk       @relation(fields: [riskId], references: [id], onDelete: Cascade)
+
+  @@id([initiativeId, riskId])
+}
+
+// ─── KPI ────────────────────────────────────────────────────────────────────
+
+model KPI {
+  id         String @id @default(cuid())
+  name       String
+  definition String @default("")
+  calcMethod String @default("")
+  unit       String @default("")
+  target     Float  @default(0)
+  actual     Float  @default(0)
+  rag        RAG    @default(Amber)
+  trend      String // "up" | "down" | "flat"
+  categoryId String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+}
+
+// ─── Supplier ───────────────────────────────────────────────────────────────
+
+model Supplier {
+  id                    String           @id @default(cuid())
+  name                  String
+  normalizedName        String
+  parentOrg             String?
+  segment               SupplierSegment
+  annualSpend           Float            @default(0)
+  riskScore             Int              @default(0)
+  performanceScore      Int              @default(0)
+  diversityClassification String?
+  country               String
+  tier                  Int              @default(1)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  deletedAt             DateTime?
+
+  categories CategorySupplier[]
+  contracts  Contract[]
+  risks      Risk[]
+}
+
+model CategorySupplier {
+  categoryId String
+  supplierId String
+
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  @@id([categoryId, supplierId])
+}
+
+// ─── Contract ────────────────────────────────────────────────────────────────
+
+model Contract {
+  id          String        @id @default(cuid())
+  supplierId  String
+  categoryId  String
+  title       String
+  startDate   DateTime
+  endDate     DateTime
+  renewalDate DateTime
+  annualValue Float        @default(0)
+  status      ContractStatus @default(Active)
+  keyTerms    Json         @default("{}")
+  clauseScores Json        @default("{}")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  supplier Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+}
+
+// ─── Roadmap ────────────────────────────────────────────────────────────────
+
+model RoadmapItem {
+  id            String   @id @default(cuid())
+  initiativeId  String
+  wave          Int
+  startDate     DateTime
+  endDate       DateTime
+  milestones    Json     @default("[]") // [{ name, date, completed }]
+  ownerIds      String[] @default([])
+  dependencyIds String[] @default([])
+  criticalPath  Boolean  @default(false)
+  progress      Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  initiative Initiative @relation(fields: [initiativeId], references: [id], onDelete: Cascade)
+}
+
+// ─── Requirements & Objectives ──────────────────────────────────────────────
+
+model BusinessRequirement {
+  id              String             @id @default(cuid())
+  title           String
+  statement       String             @default("")
+  stakeholderId   String
+  stakeholderName String
+  function        String             @default("")
+  driver          RequirementDriver
+  priority        RequirementPriority
+  status          RequirementStatus  @default(Proposed)
+  metricTarget    String?
+  evidence        String?
+  constraints     String?
+  dueDate         DateTime?
+  tags            String[]           @default([])
+  impactedModules String[]           @default([])
+  objectiveId     String?
+  categoryId      String
+  updatedAt       DateTime           @updatedAt
+
+  category  Category   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  objective Objective? @relation(fields: [objectiveId], references: [id], onDelete: SetNull)
+}
+
+model Objective {
+  id             String   @id @default(cuid())
+  title          String
+  description    String   @default("")
+  metricTarget   String?
+  owner          String
+  ownerId        String?
+  targetDate     DateTime?
+  categoryId     String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  category     Category             @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  requirements BusinessRequirement[]
+}
+
+// ─── Audit & Notifications ──────────────────────────────────────────────────
+
+model AuditEvent {
+  id         String     @id @default(cuid())
+  objectType String
+  objectId   String
+  action     AuditAction
+  actorId    String
+  summary    String     @default("")
+  payload    Json?      // optional old/new values
+  createdAt  DateTime   @default(now())
+
+  actor User @relation(fields: [actorId], references: [id], onDelete: Restrict)
+}
+
+model Notification {
+  id        String         @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      NotificationType
+  read      Boolean        @default(false)
+  link      String?
+  createdAt DateTime       @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
