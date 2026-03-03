@@ -1,0 +1,47 @@
+# Frontend (Next.js UI) and Backend (Next.js API - same app, optional second instance).
+# Optional: uncomment the db service and DATABASE_URL when using Prisma.
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      # - DATABASE_URL=postgresql://postgres:postgres@db:5432/opportunity_tracker
+    # depends_on:
+    #   - db
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "3001:3000"
+    environment:
+      - NODE_ENV=production
+      # - DATABASE_URL=postgresql://postgres:postgres@db:5432/opportunity_tracker
+    # depends_on:
+    #   - db
+
+  # Uncomment when using Prisma and set DATABASE_URL in frontend (and backend if used).
+  # db:
+  #   image: postgres:16-alpine
+  #   environment:
+  #     POSTGRES_USER: postgres
+  #     POSTGRES_PASSWORD: postgres
+  #     POSTGRES_DB: opportunity_tracker
+  #   volumes:
+  #     - pgdata:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U postgres"]
+  #     interval: 5s
+  #     timeout: 5s
+  #     retries: 5
+
+# volumes:
+#   pgdata:

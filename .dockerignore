@@ -1,0 +1,47 @@
+# Dependencies
+node_modules
+.pnpm-store
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build output
+.next
+out
+dist
+build
+
+# Git and IDE
+.git
+.gitignore
+.cursor
+*.md
+!README.md
+
+# Env (use build args or compose env instead)
+.env
+.env.*
+!.env.example
+
+# Misc
+latest zip
+*.zip
+node-v24.13.1-win-x64
+node-v24.13.1-win-x64.zip
+.DS_Store
+*.log
+terminals
+agent-transcripts
+
+# Docs and scripts (optional; remove if you need them in image)
+docs
+scripts
+*.ps1
+*.cmd
+GITHUB-SETUP.md
+SETUP-WINDOWS.md
+TROUBLESHOOTING.md
+push-to-github.ps1
+start-server.cmd
+start-server.ps1
