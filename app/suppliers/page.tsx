@@ -54,7 +54,7 @@ export default function SuppliersPage() {
           </TabsTrigger>
           <TabsTrigger value="playbooks" className="text-xs gap-1.5">
             <BookOpen className="h-3.5 w-3.5" />
-            {"Playbooks & Actions"}
+            {"Insights & Opportunities"}
           </TabsTrigger>
         </TabsList>
 

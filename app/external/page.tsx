@@ -131,7 +131,7 @@ export default function ExternalPage() {
   const { selectedCategory } = useCategory()
 
   // Tab
-  const [activeTab, setActiveTab] = useState("market-context")
+  const [activeTab, setActiveTab] = useState("research")
 
   // Sources
   const [sources, setSources] = useState<Source[]>(INITIAL_SOURCES)
@@ -411,22 +411,12 @@ export default function ExternalPage() {
       {/* ── Top-level Tabs ──────────────────────────────────────────── */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
         <TabsList className="h-9">
-          <TabsTrigger value="market-context" className="text-xs gap-1.5"><Globe className="h-3.5 w-3.5" />Market Context</TabsTrigger>
-          <TabsTrigger value="value-chain" className="text-xs gap-1.5"><GitBranch className="h-3.5 w-3.5" />Value Chain</TabsTrigger>
-          <TabsTrigger value="research" className="text-xs gap-1.5"><Search className="h-3.5 w-3.5" />Research</TabsTrigger>
+<TabsTrigger value="research" className="text-xs gap-1.5"><Search className="h-3.5 w-3.5" />Research</TabsTrigger>
+                <TabsTrigger value="value-chain" className="text-xs gap-1.5"><GitBranch className="h-3.5 w-3.5" />Value Chain</TabsTrigger>
+                <TabsTrigger value="market-context" className="text-xs gap-1.5"><Globe className="h-3.5 w-3.5" />Market Context</TabsTrigger>
         </TabsList>
 
-        {/* ═══════════ TAB 1: MARKET CONTEXT ════════════════════════ */}
-        <TabsContent value="market-context" className="space-y-0">
-          <MarketContextTab />
-        </TabsContent>
-
-        {/* ═══════════ TAB 2: VALUE CHAIN ═══════════════════════════ */}
-        <TabsContent value="value-chain" className="space-y-0">
-          <ValueChainTab onNavigateToResearch={navigateToResearch} />
-        </TabsContent>
-
-        {/* ═══════════ TAB 3: RESEARCH (existing) ══════════════════= */}
+        {/* ═══════════ TAB 1: RESEARCH ═══════════════════════════════ */}
         <TabsContent value="research" className="space-y-4">
 
       {/* ── Search Bar + Filters ───────────────────────────────────── */}
@@ -763,6 +753,16 @@ export default function ExternalPage() {
         </div>
       </div>
 
+        </TabsContent>
+
+        {/* ═══════════ TAB 2: VALUE CHAIN ═══════════════════════════ */}
+        <TabsContent value="value-chain" className="space-y-0">
+          <ValueChainTab onNavigateToResearch={navigateToResearch} />
+        </TabsContent>
+
+        {/* ═══════════ TAB 3: MARKET CONTEXT ════════════════════════ */}
+        <TabsContent value="market-context" className="space-y-0">
+          <MarketContextTab />
         </TabsContent>
       </Tabs>
 

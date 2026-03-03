@@ -3,15 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "cross-env NODE_TLS_REJECT_UNAUTHORIZED=0 prisma generate && next dev --turbo --port 3000",
-    "build": "cross-env NODE_TLS_REJECT_UNAUTHORIZED=0 prisma generate && next build",
+    "dev": "next dev --turbo",
+    "build": "next build",
     "start": "next start",
-    "lint": "next lint",
-    "db:generate": "cross-env NODE_TLS_REJECT_UNAUTHORIZED=0 prisma generate",
-    "db:push": "prisma db push",
-    "db:migrate": "prisma migrate dev",
-    "db:seed": "prisma db seed",
-    "db:studio": "prisma studio"
+    "lint": "next lint"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -46,7 +41,7 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "1.1.1",
-    "date-fns": "^3.6.0",
+    "date-fns": "4.1.0",
     "embla-carousel-react": "8.5.1",
     "input-otp": "1.4.1",
     "lucide-react": "^0.544.0",
@@ -62,9 +57,7 @@
     "tailwind-merge": "^2.5.5",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^1.1.2",
-    "zod": "^3.24.1",
-    "@prisma/client": "^6.0.0",
-    "cross-env": "^7.0.3"
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.13",
@@ -73,12 +66,7 @@
     "@types/react-dom": "19.2.3",
     "postcss": "^8.5",
     "tailwindcss": "^3.4.17",
-    "typescript": "5.7.3",
-    "prisma": "^6.0.0",
-    "tsx": "^4.19.0"
-  },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "typescript": "5.7.3"
   },
   "pnpm": {
     "overrides": {

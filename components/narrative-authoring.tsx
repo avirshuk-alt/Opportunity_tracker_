@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useMemo, useCallback } from "react"
+import React, { useState, useMemo, useCallback, useRef, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -13,10 +13,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import {
-  Target,
   Eye,
-  Lightbulb,
-  Map,
   FileText,
   Sparkles,
   ChevronDown,
@@ -30,11 +27,11 @@ import {
   ShieldAlert,
   X,
   Send,
+  Loader2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import {
   getAllInsightsForCategory,
-  suggestObjectives,
   generateMacroObservations,
   generateObservations,
   generateRoadmapNarrative,
@@ -48,13 +45,6 @@ import {
 } from "@/lib/data"
 
 // ─── Types ──────────────────────────────────────────────────────────────────
-
-interface AuthoringObjective {
-  id: string
-  title: string
-  description: string
-  derivedFrom: string[]
-}
 
 interface MacroObservation {
   id: string
@@ -105,7 +95,6 @@ function StorySection({
   number,
   title,
   subtitle,
-  icon: Icon,
   children,
   actions,
   defaultOpen = true,
@@ -113,14 +102,13 @@ function StorySection({
   number: number
   title: string
   subtitle: string
-  icon: React.ElementType
   children: React.ReactNode
   actions?: React.ReactNode
   defaultOpen?: boolean
 }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <Card>
+    <Card className="rounded-2xl shadow-sm border border-border">
       <CardHeader
         className="cursor-pointer select-none py-4 px-5"
         onClick={() => setOpen((v) => !v)}
@@ -130,7 +118,6 @@ function StorySection({
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold shrink-0">
               {number}
             </div>
-            <Icon className="h-4 w-4 text-muted-foreground" />
             <div>
               <CardTitle className="text-sm font-semibold">{title}</CardTitle>
               <CardDescription className="text-xs">{subtitle}</CardDescription>
@@ -207,7 +194,6 @@ export function NarrativeAuthoring({ categoryId }: NarrativeAuthoringProps) {
   const [drawerSearch, setDrawerSearch] = useState("")
 
   // Section data
-  const [objectives, setObjectives] = useState<AuthoringObjective[]>([])
   const [macros, setMacros] = useState<MacroObservation[]>([])
   const [observations, setObservations] = useState<ObservationCard[]>([])
   const [opportunitySort, setOpportunitySort] = useState<"impact" | "feasibility" | "strategic">("impact")
@@ -217,6 +203,13 @@ export function NarrativeAuthoring({ categoryId }: NarrativeAuthoringProps) {
 
   // Compiled narrative panel open
   const [compiledOpen, setCompiledOpen] = useState(false)
+
+  // Loading states for AI generation buttons
+  const [loadingMacro, setLoadingMacro] = useState(false)
+  const [loadingObservations, setLoadingObservations] = useState(false)
+  const [loadingRoadmap, setLoadingRoadmap] = useState(false)
+  const mountedRef = useRef(true)
+  useEffect(() => { return () => { mountedRef.current = false } }, [])
 
   // ─── Data ───────────────────────────────────────────────────────
 
@@ -271,46 +264,49 @@ export function NarrativeAuthoring({ categoryId }: NarrativeAuthoringProps) {
     setDrawerOpen(true)
   }, [])
 
-  const autoGenerateObjectives = useCallback(() => {
-    const suggestions = suggestObjectives(categoryId)
-    setObjectives(
-      suggestions.map((s, idx) => ({
-        id: `gen-obj-${idx}`,
-        title: s.title,
-        description: s.description,
-        derivedFrom: s.derivedFrom,
-      })),
-    )
-  }, [categoryId])
-
   const generateMacro = useCallback(() => {
-    const obs = generateMacroObservations(categoryId)
-    setMacros(
-      obs.map((o, idx) => ({
-        id: `macro-${idx}`,
-        title: o.title,
-        text: o.text,
-        sourceIds: o.sourceIds,
-      })),
-    )
+    setLoadingMacro(true)
+    setTimeout(() => {
+      if (!mountedRef.current) return
+      const obs = generateMacroObservations(categoryId)
+      setMacros(
+        obs.map((o, idx) => ({
+          id: `macro-${idx}`,
+          title: o.title,
+          text: o.text,
+          sourceIds: o.sourceIds,
+        })),
+      )
+      setLoadingMacro(false)
+    }, 1000)
   }, [categoryId])
 
   const aiSuggestObservations = useCallback(() => {
-    const obs = generateObservations(categoryId)
-    setObservations(
-      obs.map((o, idx) => ({
-        id: `obs-${idx}`,
-        title: o.title,
-        evidence: o.evidence,
-        impact: o.impact,
-        leadsTo: o.leadsTo,
-      })),
-    )
+    setLoadingObservations(true)
+    setTimeout(() => {
+      if (!mountedRef.current) return
+      const obs = generateObservations(categoryId)
+      setObservations(
+        obs.map((o, idx) => ({
+          id: `obs-${idx}`,
+          title: o.title,
+          evidence: o.evidence,
+          impact: o.impact,
+          leadsTo: o.leadsTo,
+        })),
+      )
+      setLoadingObservations(false)
+    }, 1000)
   }, [categoryId])
 
   const generateRoadmap = useCallback(() => {
-    const text = generateRoadmapNarrative(categoryId)
-    setSectionText((prev) => ({ ...prev, roadmap: text }))
+    setLoadingRoadmap(true)
+    setTimeout(() => {
+      if (!mountedRef.current) return
+      const text = generateRoadmapNarrative(categoryId)
+      setSectionText((prev) => ({ ...prev, roadmap: text }))
+      setLoadingRoadmap(false)
+    }, 1000)
   }, [categoryId])
 
   const updateSectionText = useCallback((key: string, value: string) => {
@@ -321,12 +317,6 @@ export function NarrativeAuthoring({ categoryId }: NarrativeAuthoringProps) {
 
   const compiledNarrative = useMemo(() => {
     const parts: string[] = []
-
-    // Objectives
-    if (objectives.length > 0) {
-      parts.push("OBJECTIVES")
-      parts.push(objectives.map((o, i) => `${i + 1}. ${o.title}: ${o.description}`).join("\n"))
-    }
 
     // Macro
     if (macros.length > 0 || sectionText.macro) {
@@ -359,12 +349,12 @@ export function NarrativeAuthoring({ categoryId }: NarrativeAuthoringProps) {
     }
 
     return parts.join("\n\n") || "Generate content in each section above to see the compiled narrative here."
-  }, [objectives, macros, observations, sortedInitiatives, sectionText])
+  }, [macros, observations, sortedInitiatives, sectionText])
 
   // ─── Render ───────────────────────────────────────────────────
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-10">
       {/* ─── Header + Context Input ─────────────────────────── */}
       <div className="space-y-4">
         <div>
@@ -421,92 +411,15 @@ export function NarrativeAuthoring({ categoryId }: NarrativeAuthoringProps) {
         )}
       </div>
 
-      {/* ─── 1. Objectives ──────────────────────────────────── */}
+      {/* ─── 1. Macro Perspective ───────────────────────────── */}
       <StorySection
         number={1}
-        title="Objectives"
-        subtitle="What are we trying to achieve?"
-        icon={Target}
-        actions={
-          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={autoGenerateObjectives}>
-            <Sparkles className="mr-1 h-3 w-3" />
-            Auto-generate objectives
-          </Button>
-        }
-      >
-        {objectives.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-center">
-            <Target className="h-8 w-8 text-muted-foreground/40 mb-3" />
-            <p className="text-xs text-muted-foreground max-w-xs">
-              Click &quot;Auto-generate objectives&quot; to propose objectives from your requirements, risks, and opportunities. You can edit or add more afterwards.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {objectives.map((obj, idx) => (
-              <div key={obj.id} className="flex items-start gap-3 rounded-lg border p-3">
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold shrink-0 mt-0.5">
-                  {idx + 1}
-                </div>
-                <div className="flex-1 min-w-0 space-y-1.5">
-                  <input
-                    type="text"
-                    value={obj.title}
-                    onChange={(e) => {
-                      const next = [...objectives]
-                      next[idx] = { ...obj, title: e.target.value }
-                      setObjectives(next)
-                    }}
-                    className="w-full text-sm font-semibold bg-transparent border-none p-0 focus:outline-none focus:ring-0"
-                  />
-                  <Textarea
-                    value={obj.description}
-                    onChange={(e) => {
-                      const next = [...objectives]
-                      next[idx] = { ...obj, description: e.target.value }
-                      setObjectives(next)
-                    }}
-                    rows={2}
-                    className="text-xs resize-none"
-                  />
-                  <SourcePills ids={obj.derivedFrom} allInsights={allInsights} onClickId={openInsightInDrawer} />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setObjectives((prev) => prev.filter((_, i) => i !== idx))}
-                  className="text-muted-foreground hover:text-foreground mt-0.5"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            ))}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-xs"
-              onClick={() =>
-                setObjectives((prev) => [
-                  ...prev,
-                  { id: `obj-manual-${Date.now()}`, title: "New objective", description: "", derivedFrom: [] },
-                ])
-              }
-            >
-              + Add objective
-            </Button>
-          </div>
-        )}
-      </StorySection>
-
-      {/* ─── 2. Macro Perspective ───────────────────────────── */}
-      <StorySection
-        number={2}
         title="Big picture: what's happening in the category"
         subtitle="Executive-level observations blending internal and external signals"
-        icon={Eye}
         actions={
-          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={generateMacro}>
-            <Sparkles className="mr-1 h-3 w-3" />
-            Generate macro narrative
+          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={generateMacro} disabled={loadingMacro}>
+            {loadingMacro ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Sparkles className="mr-1 h-3 w-3" />}
+            {loadingMacro ? "Generating..." : "Generate macro narrative"}
           </Button>
         }
       >
@@ -551,16 +464,15 @@ export function NarrativeAuthoring({ categoryId }: NarrativeAuthoringProps) {
         )}
       </StorySection>
 
-      {/* ─── 3. Observations ────────────────────────────────── */}
+      {/* ─── 2. Observations ────────────────────────────────── */}
       <StorySection
-        number={3}
+        number={2}
         title="What we're seeing (behaviors & observations)"
         subtitle="Patterns, gaps, and signals from your data"
-        icon={AlertTriangle}
         actions={
-          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={aiSuggestObservations}>
-            <Sparkles className="mr-1 h-3 w-3" />
-            AI suggest observations
+          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={aiSuggestObservations} disabled={loadingObservations}>
+            {loadingObservations ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Sparkles className="mr-1 h-3 w-3" />}
+            {loadingObservations ? "Generating..." : "AI suggest observations"}
           </Button>
         }
       >
@@ -638,12 +550,11 @@ export function NarrativeAuthoring({ categoryId }: NarrativeAuthoringProps) {
         )}
       </StorySection>
 
-      {/* ─── 4. Opportunities ───────────────────────────────── */}
+      {/* ─── 3. Opportunities ───────────────────────────────── */}
       <StorySection
-        number={4}
+        number={3}
         title="Opportunities"
         subtitle="Value creation and risk reduction levers"
-        icon={Lightbulb}
         actions={
           <div className="flex items-center gap-2">
             <div className="flex items-center rounded-md border bg-muted p-0.5">
@@ -682,16 +593,15 @@ export function NarrativeAuthoring({ categoryId }: NarrativeAuthoringProps) {
         </div>
       </StorySection>
 
-      {/* ─── 5. Roadmap ─────────────────────────────────────── */}
+      {/* ─── 4. Roadmap ─────────────────────────────────────── */}
       <StorySection
-        number={5}
+        number={4}
         title="How we'll deliver: roadmap"
         subtitle="Phased execution plan"
-        icon={Map}
         actions={
-          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={generateRoadmap}>
-            <Sparkles className="mr-1 h-3 w-3" />
-            Generate roadmap narrative
+          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={generateRoadmap} disabled={loadingRoadmap}>
+            {loadingRoadmap ? <Loader2 className="mr-1 h-3 w-3 animate-spin" /> : <Sparkles className="mr-1 h-3 w-3" />}
+            {loadingRoadmap ? "Generating..." : "Generate roadmap narrative"}
           </Button>
         }
       >
@@ -734,8 +644,8 @@ export function NarrativeAuthoring({ categoryId }: NarrativeAuthoringProps) {
         </div>
       </StorySection>
 
-      {/* ─── 6. Compiled Narrative ──────────────────────────── */}
-      <Card className="border-primary/20">
+      {/* ─── 5. Compiled Narrative ──────────────────────────── */}
+      <Card className="border-primary/20 rounded-2xl shadow-sm">
         <CardHeader
           className="cursor-pointer py-4 px-5"
           onClick={() => setCompiledOpen((v) => !v)}

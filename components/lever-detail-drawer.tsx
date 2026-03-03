@@ -22,6 +22,9 @@ import {
   getBucketColor,
   getConfidenceColor,
   getLeverStatusColor,
+  getLeverAnalysisReadiness,
+  getAnalysisReadinessColor,
+  leverModelConfigs,
 } from "@/lib/opportunity-tracker-data"
 import type { UnifiedInsight } from "@/lib/insights-adapter"
 import { cn } from "@/lib/utils"
@@ -29,6 +32,7 @@ import {
   Beaker,
   BookOpen,
   Brain,
+  Calculator,
   ChevronRight,
   Database,
   FileBarChart,
@@ -50,6 +54,7 @@ interface LeverDetailDrawerProps {
   onCreateInitiative: (initiative: TrackerInitiative) => void
   onOpenAnalysis?: (analysisId: string) => void
   onRefreshRecommendation?: () => void
+  onAnalyzeSavings?: () => void
 }
 
 export function LeverDetailDrawer({
@@ -61,6 +66,7 @@ export function LeverDetailDrawer({
   onCreateInitiative,
   onOpenAnalysis,
   onRefreshRecommendation,
+  onAnalyzeSavings,
 }: LeverDetailDrawerProps) {
   const [showSizing, setShowSizing] = useState(false)
   const [showNewInitiative, setShowNewInitiative] = useState(false)
@@ -161,6 +167,34 @@ export function LeverDetailDrawer({
 
         <ScrollArea className="flex-1 px-6 pb-6">
           <div className="space-y-6">
+            {/* Analyze Savings CTA */}
+            {onAnalyzeSavings && (
+              <Card className="shadow-none border-primary/20 bg-primary/5">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Savings Analysis</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Model savings scenarios with interactive controls
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge 
+                        variant="outline" 
+                        className={cn("text-[10px]", getAnalysisReadinessColor(getLeverAnalysisReadiness(lever)))}
+                      >
+                        {getLeverAnalysisReadiness(lever)}
+                      </Badge>
+                      <Button size="sm" className="h-8 text-xs gap-1.5" onClick={onAnalyzeSavings}>
+                        <Calculator className="h-3.5 w-3.5" />
+                        Analyze Savings
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* 1. Overview */}
             <section>
               <h3 className="text-sm font-semibold text-foreground mb-2 flex items-center gap-2">

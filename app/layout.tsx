@@ -11,13 +11,13 @@ const _jetbrainsMono = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Value Capture Architect",
+  title: "Category Strategy Hub",
   description:
-    "Enterprise procurement and category strategy platform for authoring strategies, managing suppliers, tracking risks, and governing execution.",
+    "AI-powered Category Strategy Platform for authoring strategies, managing suppliers, tracking risks, and governing execution.",
 }
 
 export const viewport: Viewport = {
-  themeColor: "#1a1f2e",
+  themeColor: "#ffffff",
   width: "device-width",
   initialScale: 1,
 }

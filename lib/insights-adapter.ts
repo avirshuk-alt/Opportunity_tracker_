@@ -305,6 +305,257 @@ export function generateObservations(
   ]
 }
 
+// ─── Executive Summary Generator ────────────────────────────────────────────
+
+export interface ExecutiveSummaryData {
+  strategicThemes: string[]
+  totalValueAtStake: number
+  keyTradeOffs: string[]
+  topRisks: string[]
+  roadmapDirection: string
+  version: number
+  generatedAt: string
+}
+
+export function generateExecutiveSummary(categoryId: string): ExecutiveSummaryData {
+  const inits = getInitiativesByCategory(categoryId)
+  const risks = getRisksByCategory(categoryId)
+  const reqs = getRequirementsByCategory(categoryId)
+  const totalValue = inits.reduce((s, i) => s + i.targetSavings, 0)
+  const openRisks = risks.filter((r) => r.status === "Open" || r.status === "Mitigating")
+
+  return {
+    strategicThemes: [
+      "Cost optimization through supplier consolidation and lease restructuring",
+      "Supply base resilience via dual-sourcing and geographic diversification",
+      "EV transition to meet sustainability mandates and reduce long-term TCO",
+      reqs.some((r) => r.driver === "Compliance")
+        ? "Compliance enforcement through automated policy governance"
+        : "Operational efficiency through process standardization",
+    ],
+    totalValueAtStake: totalValue,
+    keyTradeOffs: [
+      "Short-term disruption from supplier consolidation vs. long-term cost savings",
+      "Higher upfront EV acquisition costs vs. lower lifecycle TCO",
+      "Tighter governance constraints vs. field team flexibility",
+    ],
+    topRisks: openRisks.slice(0, 4).map((r) => `${r.title} (score: ${r.riskScore}, threshold: ${r.appetiteThreshold})`),
+    roadmapDirection: `Execute in three phases over 18-36 months, targeting $${(totalValue / 1e6).toFixed(1)}M in total value through ${inits.length} initiatives.`,
+    version: 1,
+    generatedAt: new Date().toISOString().slice(0, 10),
+  }
+}
+
+// ─── Category Diagnosis Generator ───────────────────────────────────────────
+
+export interface CategoryDiagnosisData {
+  marketSupplyDemand: string
+  costStructuralPressures: string
+  supplierLandscape: string
+  internalPerformanceGaps: string
+  version: number
+  generatedAt: string
+}
+
+export function generateCategoryDiagnosis(categoryId: string): CategoryDiagnosisData {
+  const inits = getInitiativesByCategory(categoryId)
+  const risks = getRisksByCategory(categoryId)
+  const reqs = getRequirementsByCategory(categoryId)
+
+  return {
+    marketSupplyDemand: `The category is experiencing shifting supply-demand dynamics driven by ${reqs.length} business requirements. OEM lead times have extended, and market tightness is creating upward pricing pressure. EV supply chains remain constrained in key regions, with delivery lead times averaging 78 days against a 60-day target.`,
+    costStructuralPressures: `Total category spend exceeds targets, with ${reqs.filter((r) => r.driver === "Cost").length} cost-driven requirements highlighting the need for structural cost reduction. Current cost-per-driver metrics sit 22% above pharma fleet benchmarks, driven by supplier fragmentation, policy non-compliance, and sub-optimal lease terms.`,
+    supplierLandscape: `The supplier base of 34 active providers is significantly above the target of 18. This fragmentation dilutes negotiating leverage and increases administrative overhead. ${risks.filter((r) => r.scope === "Supplier").length} supplier-specific risks have been identified, with concentration risk in maintenance and EMEA lease services requiring attention.`,
+    internalPerformanceGaps: `Policy compliance stands at 79% against a 95% target, representing a $4.1M exposure in exception spend. The savings pipeline of $${(inits.reduce((s, i) => s + i.targetSavings, 0) / 1e6).toFixed(1)}M is healthy but confidence-weighted realization requires active management. ${inits.filter((i) => i.confidence < 60).length} initiatives have confidence below 60%.`,
+    version: 1,
+    generatedAt: new Date().toISOString().slice(0, 10),
+  }
+}
+
+// ─── Strategic Themes Generator ─────────────────────────────────────────────
+
+export interface StrategicThemeData {
+  id: string
+  name: string
+  rationale: string
+  linkedObjectiveIds: string[]
+  linkedInsightIds: string[]
+  expectedImpactRange: string
+}
+
+export function generateStrategicThemes(categoryId: string): StrategicThemeData[] {
+  const inits = getInitiativesByCategory(categoryId)
+  const risks = getRisksByCategory(categoryId)
+  const reqs = getRequirementsByCategory(categoryId)
+  const allInsights = getAllInsightsForCategory(categoryId)
+
+  const costInsights = allInsights.filter((i) => i.source === "requirement" && i.tags.includes("cost-reduction")).map((i) => i.id)
+  const riskInsights = allInsights.filter((i) => i.source === "risk").slice(0, 3).map((i) => i.id)
+  const evInsights = allInsights.filter((i) => i.tags.some((t) => t.toLowerCase().includes("ev") || t.toLowerCase().includes("sustainability"))).map((i) => i.id)
+
+  return [
+    {
+      id: "theme-1",
+      name: "Cost Optimization & Supplier Consolidation",
+      rationale: "Reducing the supplier base and renegotiating contract terms addresses the dominant cost pressure. With ${reqs.filter((r) => r.driver === 'Cost').length} cost-driven requirements, this is the most impactful near-term lever.",
+      linkedObjectiveIds: ["obj-1", "obj-1a", "obj-1b"],
+      linkedInsightIds: costInsights.slice(0, 3),
+      expectedImpactRange: `$${((inits.filter((i) => i.title.toLowerCase().includes("consolidat") || i.title.toLowerCase().includes("rebid") || i.title.toLowerCase().includes("lease")).reduce((s, i) => s + i.targetSavings, 0)) / 1e6).toFixed(1)}M`,
+    },
+    {
+      id: "theme-2",
+      name: "Supply Chain Resilience & Risk Mitigation",
+      rationale: `With ${risks.filter((r) => r.riskScore > r.appetiteThreshold).length} risks exceeding appetite thresholds, building resilience through dual-sourcing and geographic diversification is critical to protecting both supply continuity and cost position.`,
+      linkedObjectiveIds: ["obj-2", "obj-4"],
+      linkedInsightIds: riskInsights,
+      expectedImpactRange: "30% risk score reduction",
+    },
+    {
+      id: "theme-3",
+      name: "EV Transition & Sustainability",
+      rationale: "Corporate ESG mandates and favorable lifecycle economics make EV adoption both a compliance requirement and a cost optimization opportunity. The transition requires careful phasing to manage infrastructure gaps.",
+      linkedObjectiveIds: ["obj-5"],
+      linkedInsightIds: evInsights.slice(0, 3),
+      expectedImpactRange: "25% EV penetration / 20-30% fuel cost reduction",
+    },
+    {
+      id: "theme-4",
+      name: "Governance & Compliance Enforcement",
+      rationale: "Policy non-compliance drives $4.1M in exception spend. Automated governance and standardized processes will close this gap while improving operational consistency.",
+      linkedObjectiveIds: ["obj-4"],
+      linkedInsightIds: allInsights.filter((i) => i.tags.some((t) => t.toLowerCase().includes("compliance") || t.toLowerCase().includes("policy"))).slice(0, 2).map((i) => i.id),
+      expectedImpactRange: "95% compliance / $4.1M exception reduction",
+    },
+  ]
+}
+
+// ─── Initiative Portfolio Summary Generator ─────────────────────────────────
+
+export interface PortfolioInitiativeSummary {
+  id: string
+  title: string
+  impactEstimate: number
+  timelineBand: "Short" | "Mid" | "Long"
+  feasibility: "Low" | "Medium" | "High"
+  stage: string
+}
+
+export function generateInitiativePortfolio(categoryId: string): PortfolioInitiativeSummary[] {
+  const inits = getInitiativesByCategory(categoryId)
+  const roadmap = getRoadmapByCategory(categoryId)
+
+  return inits.map((init) => {
+    const rm = roadmap.find((r) => r.initiativeId === init.id)
+    let timelineBand: "Short" | "Mid" | "Long" = "Mid"
+    if (rm) {
+      if (rm.wave === 1) timelineBand = "Short"
+      else if (rm.wave === 2) timelineBand = "Mid"
+      else timelineBand = "Long"
+    } else {
+      // Estimate from stage
+      if (init.stage === "Idea" || init.stage === "Qualify") timelineBand = "Long"
+      else if (init.stage === "Contract" || init.stage === "Source") timelineBand = "Mid"
+      else timelineBand = "Short"
+    }
+
+    let feasibility: "Low" | "Medium" | "High" = "Medium"
+    if (init.confidence >= 75) feasibility = "High"
+    else if (init.confidence < 55) feasibility = "Low"
+
+    return {
+      id: init.id,
+      title: init.title,
+      impactEstimate: init.targetSavings,
+      timelineBand,
+      feasibility,
+      stage: init.stage,
+    }
+  }).sort((a, b) => b.impactEstimate - a.impactEstimate)
+}
+
+// ─── Risk & Dependency Summary Generator ────────────────────────────────────
+
+export interface RiskSummaryItem {
+  id: string
+  title: string
+  impactLevel: "Low" | "Medium" | "High"
+  mitigationSummary: string
+  riskScore: number
+  threshold: number
+}
+
+export function generateRiskSummary(categoryId: string): RiskSummaryItem[] {
+  const risks = getRisksByCategory(categoryId)
+
+  return risks
+    .filter((r) => r.status !== "Closed" && r.status !== "Accepted")
+    .sort((a, b) => b.riskScore - a.riskScore)
+    .slice(0, 8)
+    .map((r) => ({
+      id: r.id,
+      title: r.title,
+      impactLevel: r.riskScore >= 40 ? "High" : r.riskScore >= 25 ? "Medium" : "Low",
+      mitigationSummary: r.mitigationPlan ?? "Mitigation plan pending",
+      riskScore: r.riskScore,
+      threshold: r.appetiteThreshold,
+    }))
+}
+
+// ─── Roadmap & Phasing Generator ────────────────────────────────────────────
+
+export interface RoadmapPhaseData {
+  phase: string
+  timeframe: string
+  initiatives: { id: string; title: string; progress: number }[]
+}
+
+export function generateRoadmapPhasing(categoryId: string): {
+  phases: RoadmapPhaseData[]
+  valueRamp: { month: string; value: number }[]
+  version: number
+  generatedAt: string
+} {
+  const phases = getRoadmapPhasesForCategory(categoryId)
+  const inits = getInitiativesByCategory(categoryId)
+
+  const phaseData: RoadmapPhaseData[] = [
+    {
+      phase: "Phase 1",
+      timeframe: "0-6 months",
+      initiatives: phases.stabilize.map((p) => ({ id: p.id, title: p.title, progress: p.progress })),
+    },
+    {
+      phase: "Phase 2",
+      timeframe: "6-18 months",
+      initiatives: phases.optimize.map((p) => ({ id: p.id, title: p.title, progress: p.progress })),
+    },
+    {
+      phase: "Phase 3",
+      timeframe: "18-36 months",
+      initiatives: phases.transform.map((p) => ({ id: p.id, title: p.title, progress: p.progress })),
+    },
+  ]
+
+  // Value ramp for sparkline
+  const totalValue = inits.reduce((s, i) => s + i.targetSavings, 0)
+  const valueRamp = [
+    { month: "M3", value: Math.round(totalValue * 0.05) },
+    { month: "M6", value: Math.round(totalValue * 0.15) },
+    { month: "M9", value: Math.round(totalValue * 0.30) },
+    { month: "M12", value: Math.round(totalValue * 0.50) },
+    { month: "M18", value: Math.round(totalValue * 0.72) },
+    { month: "M24", value: Math.round(totalValue * 0.88) },
+    { month: "M36", value: Math.round(totalValue * 1.00) },
+  ]
+
+  return {
+    phases: phaseData,
+    valueRamp,
+    version: 1,
+    generatedAt: new Date().toISOString().slice(0, 10),
+  }
+}
+
 /** Generate roadmap narrative */
 export function generateRoadmapNarrative(categoryId: string): string {
   const phases = getRoadmapPhasesForCategory(categoryId)

@@ -90,6 +90,637 @@ export interface TrimByModel {
   tierMix: string
 }
 
+// ─── Lever Model Configuration (Universal Savings Analysis) ─────────────────
+
+export type LeverModelType = 
+  | "RateReduction"        // e.g., trim reduction, price/fee reductions
+  | "ComplianceUplift"     // e.g., policy compliance improvement
+  | "UnitReduction"        // e.g., right-sizing, utilization-based
+  | "MileageReduction"     // e.g., territory design, routing
+  | "ClaimsReduction"      // e.g., driver safety, insurance optimization
+  | "Consolidation"        // e.g., vendor consolidation, supplier shift
+  | "TCOShift"             // e.g., EV adoption, refresh cycle
+  | "DisruptionRisk"       // e.g., supply assurance, business continuity
+  | "MultiStreamValue"     // e.g., data rights, ESG value capture
+
+export type AnalysisReadiness = "Ready" | "Needs data" | "In analysis"
+
+export interface LeverModelConfig {
+  modelType: LeverModelType
+  primarySliderLabel: string
+  primarySliderMin: number
+  primarySliderMax: number
+  primarySliderDefault: number
+  primarySliderStep: number
+  primarySliderUnit: string
+  addressableBaseLabel: string
+  addressableBaseValue: number // $ or count, depending on model
+  addressableBaseUnit: string
+  savingsEquation: string // description of calculation
+  requiredInputs: { label: string; key: string; defaultValue: number; unit: string }[]
+  assumptions: string[]
+  presets?: { label: string; value: number }[]
+}
+
+export interface SavedScenario {
+  id: string
+  name: string
+  leverId: string
+  sliderValue: number
+  scopeSelections: Record<string, unknown>
+  assumptions: Record<string, unknown>
+  estimatedSavings: number
+  createdAt: string
+}
+
+// ─── Lever Model Configurations ─────────────────────────────────────────────
+
+export const leverModelConfigs: Record<string, LeverModelConfig> = {
+  // Cost Levers
+  "lev-1": { // OEM/Dealer Rate Harmonization
+    modelType: "RateReduction",
+    primarySliderLabel: "Price reduction on above-benchmark spend",
+    primarySliderMin: 0,
+    primarySliderMax: 25,
+    primarySliderDefault: 8,
+    primarySliderStep: 1,
+    primarySliderUnit: "%",
+    addressableBaseLabel: "Above-benchmark spend",
+    addressableBaseValue: 4_200_000,
+    addressableBaseUnit: "$",
+    savingsEquation: "Savings = Above-benchmark Spend × Reduction %",
+    requiredInputs: [
+      { label: "Coverage %", key: "coverage", defaultValue: 70, unit: "%" },
+    ],
+    assumptions: [
+      "Above-benchmark spend = regions/dealers pricing above best-quartile rate",
+      "Benchmark derived from internal best rate by vehicle class",
+      "Full savings realized over 12-month contract cycle",
+    ],
+    presets: [
+      { label: "Conservative (5%)", value: 5 },
+      { label: "Base (8%)", value: 8 },
+      { label: "Aggressive (12%)", value: 12 },
+    ],
+  },
+  "lev-2": { // FMC Fee Audit & Renegotiation
+    modelType: "RateReduction",
+    primarySliderLabel: "Fee reduction rate",
+    primarySliderMin: 0,
+    primarySliderMax: 30,
+    primarySliderDefault: 12,
+    primarySliderStep: 1,
+    primarySliderUnit: "%",
+    addressableBaseLabel: "Total FMC fees",
+    addressableBaseValue: 1_800_000,
+    addressableBaseUnit: "$",
+    savingsEquation: "Savings = (Leakage Pool × Recovery %) + (Fee Spend × Fee Reduction %)",
+    requiredInputs: [
+      { label: "Leakage recovery %", key: "leakageRecovery", defaultValue: 60, unit: "%" },
+      { label: "Leakage pool ($)", key: "leakagePool", defaultValue: 280_000, unit: "$" },
+    ],
+    assumptions: [
+      "Leakage includes non-contract fees, duplicates, and markups",
+      "Fee reduction applies to base management and transaction fees",
+      "Assumes contract renegotiation or competitive rebid",
+    ],
+    presets: [
+      { label: "Conservative (8%)", value: 8 },
+      { label: "Base (12%)", value: 12 },
+      { label: "Aggressive (18%)", value: 18 },
+    ],
+  },
+  "lev-3": { // Standard Model/Trim List
+    modelType: "RateReduction",
+    primarySliderLabel: "Off-list vehicle reduction",
+    primarySliderMin: 0,
+    primarySliderMax: 100,
+    primarySliderDefault: 40,
+    primarySliderStep: 5,
+    primarySliderUnit: "%",
+    addressableBaseLabel: "Off-list vehicle premium spend",
+    addressableBaseValue: 920_000,
+    addressableBaseUnit: "$",
+    savingsEquation: "Savings = Off-list Premium Spend × Reduction %",
+    requiredInputs: [
+      { label: "Avg premium per off-list vehicle", key: "avgPremium", defaultValue: 85, unit: "$/mo" },
+    ],
+    assumptions: [
+      "Off-list vehicles incur ~15-25% cost premium vs approved models",
+      "Savings realized at next refresh cycle",
+      "Assumes approved list covers all business needs",
+    ],
+    presets: [
+      { label: "Conservative (25%)", value: 25 },
+      { label: "Base (40%)", value: 40 },
+      { label: "Aggressive (60%)", value: 60 },
+    ],
+  },
+  "lev-4": { // Maintenance Network Rate Caps
+    modelType: "RateReduction",
+    primarySliderLabel: "Rate/markup reduction",
+    primarySliderMin: 0,
+    primarySliderMax: 20,
+    primarySliderDefault: 8,
+    primarySliderStep: 1,
+    primarySliderUnit: "%",
+    addressableBaseLabel: "In-network labor + parts spend",
+    addressableBaseValue: 3_400_000,
+    addressableBaseUnit: "$",
+    savingsEquation: "Savings = (Labor Spend × Labor Rate Reduction + Parts Spend × Markup Reduction) × Coverage %",
+    requiredInputs: [
+      { label: "Network coverage %", key: "coverage", defaultValue: 75, unit: "%" },
+      { label: "Parts markup reduction %", key: "partsMarkup", defaultValue: 10, unit: "%" },
+    ],
+    assumptions: [
+      "Labor spend ~60% of total maintenance spend",
+      "Parts markup currently averages 35-45% above wholesale",
+      "Network coverage varies by region",
+    ],
+    presets: [
+      { label: "Conservative (5%)", value: 5 },
+      { label: "Base (8%)", value: 8 },
+      { label: "Aggressive (12%)", value: 12 },
+    ],
+  },
+  "lev-5": { // Insurance Program Optimization
+    modelType: "ClaimsReduction",
+    primarySliderLabel: "Premium reduction",
+    primarySliderMin: 0,
+    primarySliderMax: 25,
+    primarySliderDefault: 10,
+    primarySliderStep: 1,
+    primarySliderUnit: "%",
+    addressableBaseLabel: "Total insurance premium",
+    addressableBaseValue: 2_100_000,
+    addressableBaseUnit: "$",
+    savingsEquation: "Savings = Premium Spend × Premium Reduction %",
+    requiredInputs: [
+      { label: "Deductible increase factor", key: "deductibleFactor", defaultValue: 1.5, unit: "x" },
+    ],
+    assumptions: [
+      "Premium reduction achieved via deductible adjustments and loss control",
+      "Higher deductibles trade premium for self-insurance risk",
+      "Loss ratio improvement of 5-10 points assumed",
+    ],
+    presets: [
+      { label: "Conservative (6%)", value: 6 },
+      { label: "Base (10%)", value: 10 },
+      { label: "Aggressive (15%)", value: 15 },
+    ],
+  },
+  "lev-6": { // Telematics Vendor Consolidation
+    modelType: "Consolidation",
+    primarySliderLabel: "Per-device price reduction",
+    primarySliderMin: 0,
+    primarySliderMax: 40,
+    primarySliderDefault: 18,
+    primarySliderStep: 2,
+    primarySliderUnit: "%",
+    addressableBaseLabel: "Telematics subscription spend",
+    addressableBaseValue: 680_000,
+    addressableBaseUnit: "$",
+    savingsEquation: "Savings = Telematics Spend × Price Reduction % × Coverage %",
+    requiredInputs: [
+      { label: "Consolidation coverage %", key: "coverage", defaultValue: 85, unit: "%" },
+    ],
+    assumptions: [
+      "Currently using 3+ telematics vendors",
+      "Volume discount of 15-25% expected from single-vendor contract",
+      "One-time migration costs not included",
+    ],
+    presets: [
+      { label: "Conservative (12%)", value: 12 },
+      { label: "Base (18%)", value: 18 },
+      { label: "Aggressive (25%)", value: 25 },
+    ],
+  },
+  "lev-7": { // Remarketing Residual Value Optimization
+    modelType: "RateReduction",
+    primarySliderLabel: "Residual value improvement",
+    primarySliderMin: 0,
+    primarySliderMax: 15,
+    primarySliderDefault: 5,
+    primarySliderStep: 1,
+    primarySliderUnit: "%",
+    addressableBaseLabel: "Annual remarketing volume (depreciation)",
+    addressableBaseValue: 4_800_000,
+    addressableBaseUnit: "$",
+    savingsEquation: "Savings = Depreciation Pool × Residual Improvement %",
+    requiredInputs: [],
+    assumptions: [
+      "Residual improvement via better timing, channel, and reconditioning",
+      "Assumes 20% of fleet turns over annually",
+      "Market conditions affect achievable improvement",
+    ],
+    presets: [
+      { label: "Conservative (3%)", value: 3 },
+      { label: "Base (5%)", value: 5 },
+      { label: "Aggressive (8%)", value: 8 },
+    ],
+  },
+  "lev-8": { // Rental/Replacement Vehicle Policy
+    modelType: "UnitReduction",
+    primarySliderLabel: "Rental spend reduction",
+    primarySliderMin: 0,
+    primarySliderMax: 50,
+    primarySliderDefault: 25,
+    primarySliderStep: 5,
+    primarySliderUnit: "%",
+    addressableBaseLabel: "Annual rental spend",
+    addressableBaseValue: 520_000,
+    addressableBaseUnit: "$",
+    savingsEquation: "Savings = Rental Spend × Reduction %",
+    requiredInputs: [],
+    assumptions: [
+      "Rental reduction via tighter approval policies",
+      "Rate caps negotiated with preferred vendors",
+      "Does not impact operational coverage",
+    ],
+    presets: [
+      { label: "Conservative (15%)", value: 15 },
+      { label: "Base (25%)", value: 25 },
+      { label: "Aggressive (35%)", value: 35 },
+    ],
+  },
+  
+  // Demand Levers
+  "lev-9": { // Fleet Policy Compliance
+    modelType: "ComplianceUplift",
+    primarySliderLabel: "Exception reduction rate",
+    primarySliderMin: 0,
+    primarySliderMax: 100,
+    primarySliderDefault: 40,
+    primarySliderStep: 5,
+    primarySliderUnit: "%",
+    addressableBaseLabel: "Out-of-policy cost premium",
+    addressableBaseValue: 780_000,
+    addressableBaseUnit: "$",
+    savingsEquation: "Savings = Out-of-Policy Cost Delta × Exception Reduction %",
+    requiredInputs: [
+      { label: "Current exception rate %", key: "exceptionRate", defaultValue: 18, unit: "%" },
+    ],
+    assumptions: [
+      "Out-of-policy vehicles cost 12-20% more than compliant alternatives",
+      "Exception reduction via governance and approval controls",
+      "Full compliance may not be achievable for all roles",
+    ],
+    presets: [
+      { label: "Conservative (25%)", value: 25 },
+      { label: "Base (40%)", value: 40 },
+      { label: "Aggressive (60%)", value: 60 },
+    ],
+  },
+  "lev-10": { // Right-Sizing Fleet
+    modelType: "UnitReduction",
+    primarySliderLabel: "Underutilized vehicle reduction",
+    primarySliderMin: 0,
+    primarySliderMax: 100,
+    primarySliderDefault: 30,
+    primarySliderStep: 5,
+    primarySliderUnit: "%",
+    addressableBaseLabel: "Underutilized vehicle cost",
+    addressableBaseValue: 1_450_000,
+    addressableBaseUnit: "$",
+    savingsEquation: "Savings = Underutilized Units × Cost per Unit × Reduction %",
+    requiredInputs: [
+      { label: "Underutilized unit count", key: "unitCount", defaultValue: 145, unit: "vehicles" },
+      { label: "Avg cost per unit/year", key: "costPerUnit", defaultValue: 10_000, unit: "$/yr" },
+    ],
+    assumptions: [
+      "Underutilized = <50% of expected mileage threshold",
+      "Cost includes lease, insurance, maintenance, fuel",
+      "Some underutilized vehicles may be operationally required",
+    ],
+    presets: [
+      { label: "Conservative (20%)", value: 20 },
+      { label: "Base (30%)", value: 30 },
+      { label: "Aggressive (50%)", value: 50 },
+    ],
+  },
+  "lev-11": { // Mileage Reduction
+    modelType: "MileageReduction",
+    primarySliderLabel: "Mileage reduction rate",
+    primarySliderMin: 0,
+    primarySliderMax: 25,
+    primarySliderDefault: 8,
+    primarySliderStep: 1,
+    primarySliderUnit: "%",
+    addressableBaseLabel: "Variable cost per mile pool",
+    addressableBaseValue: 2_800_000,
+    addressableBaseUnit: "$",
+    savingsEquation: "Savings = Miles in Scope × $/Mile × Mileage Reduction %",
+    requiredInputs: [
+      { label: "Annual miles in scope", key: "milesInScope", defaultValue: 18_000_000, unit: "miles" },
+      { label: "Variable cost per mile", key: "costPerMile", defaultValue: 0.156, unit: "$/mile" },
+    ],
+    assumptions: [
+      "Variable costs include fuel, maintenance, accident exposure",
+      "Mileage reduction via territory redesign and route optimization",
+      "Not all mileage is controllable",
+    ],
+    presets: [
+      { label: "Conservative (5%)", value: 5 },
+      { label: "Base (8%)", value: 8 },
+      { label: "Aggressive (12%)", value: 12 },
+    ],
+  },
+  "lev-12": { // Driver Behavior / Safety
+    modelType: "ClaimsReduction",
+    primarySliderLabel: "Claims cost reduction",
+    primarySliderMin: 0,
+    primarySliderMax: 40,
+    primarySliderDefault: 15,
+    primarySliderStep: 2,
+    primarySliderUnit: "%",
+    addressableBaseLabel: "Annual claims cost",
+    addressableBaseValue: 1_650_000,
+    addressableBaseUnit: "$",
+    savingsEquation: "Savings = Claims Cost × Claims Reduction % × Program Coverage %",
+    requiredInputs: [
+      { label: "Program coverage %", key: "coverage", defaultValue: 80, unit: "%" },
+    ],
+    assumptions: [
+      "Claims reduction via driver coaching and telematics feedback",
+      "Typical programs achieve 10-25% reduction in incident frequency",
+      "ROI depends on program cost and driver engagement",
+    ],
+    presets: [
+      { label: "Conservative (10%)", value: 10 },
+      { label: "Base (15%)", value: 15 },
+      { label: "Aggressive (25%)", value: 25 },
+    ],
+  },
+  "lev-13": { // EV Adoption
+    modelType: "TCOShift",
+    primarySliderLabel: "EV adoption rate (eligible vehicles)",
+    primarySliderMin: 0,
+    primarySliderMax: 100,
+    primarySliderDefault: 25,
+    primarySliderStep: 5,
+    primarySliderUnit: "%",
+    addressableBaseLabel: "TCO savings pool (EV-eligible)",
+    addressableBaseValue: 1_200_000,
+    addressableBaseUnit: "$",
+    savingsEquation: "Savings = Eligible Units × (TCO_ICE - TCO_EV) × Adoption %",
+    requiredInputs: [
+      { label: "Eligible vehicle count", key: "eligibleCount", defaultValue: 320, unit: "vehicles" },
+      { label: "Avg TCO delta (EV savings)", key: "tcoSavings", defaultValue: 1_875, unit: "$/yr" },
+    ],
+    assumptions: [
+      "EV eligibility based on duty cycle and charging access",
+      "TCO includes lease/purchase, fuel/electricity, maintenance, incentives",
+      "Charging infrastructure assumed available or funded separately",
+    ],
+    presets: [
+      { label: "Conservative (15%)", value: 15 },
+      { label: "Base (25%)", value: 25 },
+      { label: "Aggressive (40%)", value: 40 },
+    ],
+  },
+  "lev-14": { // Refresh Cycle Optimization
+    modelType: "TCOShift",
+    primarySliderLabel: "Fleet moved to optimal cycle",
+    primarySliderMin: 0,
+    primarySliderMax: 100,
+    primarySliderDefault: 35,
+    primarySliderStep: 5,
+    primarySliderUnit: "%",
+    addressableBaseLabel: "Suboptimal cycle cost delta",
+    addressableBaseValue: 980_000,
+    addressableBaseUnit: "$",
+    savingsEquation: "Savings = Units × (Cost_Current - Cost_Optimal) × Adoption %",
+    requiredInputs: [
+      { label: "Vehicles with suboptimal cycles", key: "suboptimalCount", defaultValue: 420, unit: "vehicles" },
+    ],
+    assumptions: [
+      "Optimal cycle varies by vehicle class (typically 36-48 months)",
+      "Savings from depreciation curve and maintenance inflection",
+      "Implementation requires lease term flexibility",
+    ],
+    presets: [
+      { label: "Conservative (20%)", value: 20 },
+      { label: "Base (35%)", value: 35 },
+      { label: "Aggressive (50%)", value: 50 },
+    ],
+  },
+  "lev-20": { // Reduce Trim Proliferation (flagship)
+    modelType: "RateReduction",
+    primarySliderLabel: "Premium trim reduction rate",
+    primarySliderMin: 0,
+    primarySliderMax: 100,
+    primarySliderDefault: 30,
+    primarySliderStep: 1,
+    primarySliderUnit: "%",
+    addressableBaseLabel: "Premium spend in selected tiers",
+    addressableBaseValue: 5_318_580, // calculated from dataset
+    addressableBaseUnit: "$",
+    savingsEquation: "Savings = Addressable Premium Spend × Reduction Rate",
+    requiredInputs: [],
+    assumptions: [
+      "Addressable spend = premium trim spend for selected role tiers",
+      "Premium reduction shifts vehicles from premium to base trims",
+      "Savings realized at next vehicle refresh",
+    ],
+    presets: [
+      { label: "Conservative (15%)", value: 15 },
+      { label: "Base (30%)", value: 30 },
+      { label: "Aggressive (45%)", value: 45 },
+    ],
+  },
+  
+  // Value Levers
+  "lev-15": { // Supply Assurance Strategy
+    modelType: "DisruptionRisk",
+    primarySliderLabel: "Risk reduction",
+    primarySliderMin: 0,
+    primarySliderMax: 100,
+    primarySliderDefault: 40,
+    primarySliderStep: 5,
+    primarySliderUnit: "%",
+    addressableBaseLabel: "Disruption exposure cost",
+    addressableBaseValue: 850_000,
+    addressableBaseUnit: "$",
+    savingsEquation: "Value = (Probability × Impact Cost) × Risk Reduction % × Coverage %",
+    requiredInputs: [
+      { label: "Coverage of critical lanes %", key: "coverage", defaultValue: 70, unit: "%" },
+    ],
+    assumptions: [
+      "Disruption exposure based on historical lead-time failures",
+      "Value includes avoided downtime, expedite fees, rentals",
+      "Dual-sourcing and SLAs reduce but don't eliminate risk",
+    ],
+    presets: [
+      { label: "Conservative (25%)", value: 25 },
+      { label: "Base (40%)", value: 40 },
+      { label: "Aggressive (60%)", value: 60 },
+    ],
+  },
+  "lev-16": { // Data Rights + Analytics Value
+    modelType: "MultiStreamValue",
+    primarySliderLabel: "Benefit realization rate",
+    primarySliderMin: 0,
+    primarySliderMax: 100,
+    primarySliderDefault: 35,
+    primarySliderStep: 5,
+    primarySliderUnit: "%",
+    addressableBaseLabel: "Analytics value pool",
+    addressableBaseValue: 620_000,
+    addressableBaseUnit: "$",
+    savingsEquation: "Value = Sum(Use Case Pool × Improvement %) × Realization %",
+    requiredInputs: [],
+    assumptions: [
+      "Value from claims reduction, maintenance optimization, fraud prevention",
+      "Realization depends on data quality and analytics capability",
+      "Full value requires contractual data ownership",
+    ],
+    presets: [
+      { label: "Conservative (20%)", value: 20 },
+      { label: "Base (35%)", value: 35 },
+      { label: "Aggressive (50%)", value: 50 },
+    ],
+  },
+  "lev-17": { // Dealer Network Performance
+    modelType: "RateReduction",
+    primarySliderLabel: "Cycle time reduction",
+    primarySliderMin: 0,
+    primarySliderMax: 40,
+    primarySliderDefault: 15,
+    primarySliderStep: 2,
+    primarySliderUnit: "%",
+    addressableBaseLabel: "Downtime + rework cost pool",
+    addressableBaseValue: 480_000,
+    addressableBaseUnit: "$",
+    savingsEquation: "Savings = (Downtime Cost × Cycle Reduction %) + (Rework Cost × Defect Reduction %)",
+    requiredInputs: [
+      { label: "Defect reduction %", key: "defectReduction", defaultValue: 10, unit: "%" },
+    ],
+    assumptions: [
+      "Downtime cost based on average service cycle time",
+      "Rework includes repeat visits and warranty claims",
+      "Performance program requires dealer buy-in",
+    ],
+    presets: [
+      { label: "Conservative (10%)", value: 10 },
+      { label: "Base (15%)", value: 15 },
+      { label: "Aggressive (25%)", value: 25 },
+    ],
+  },
+  "lev-18": { // ESG & Compliance Value
+    modelType: "MultiStreamValue",
+    primarySliderLabel: "Compliance gap closure",
+    primarySliderMin: 0,
+    primarySliderMax: 100,
+    primarySliderDefault: 50,
+    primarySliderStep: 5,
+    primarySliderUnit: "%",
+    addressableBaseLabel: "Penalty exposure + incentive pool",
+    addressableBaseValue: 340_000,
+    addressableBaseUnit: "$",
+    savingsEquation: "Value = (Penalty Exposure + Remediation Cost) × Gap Closure % + Incentives × Capture %",
+    requiredInputs: [
+      { label: "Incentive capture %", key: "incentiveCapture", defaultValue: 40, unit: "%" },
+    ],
+    assumptions: [
+      "Penalty exposure from emerging emissions regulations",
+      "Incentives include federal/state EV credits",
+      "ESG reporting requirements increasing",
+    ],
+    presets: [
+      { label: "Conservative (30%)", value: 30 },
+      { label: "Base (50%)", value: 50 },
+      { label: "Aggressive (70%)", value: 70 },
+    ],
+  },
+  "lev-19": { // Business Continuity / Resilience
+    modelType: "DisruptionRisk",
+    primarySliderLabel: "Downtime reduction",
+    primarySliderMin: 0,
+    primarySliderMax: 100,
+    primarySliderDefault: 35,
+    primarySliderStep: 5,
+    primarySliderUnit: "%",
+    addressableBaseLabel: "Downtime exposure cost",
+    addressableBaseValue: 420_000,
+    addressableBaseUnit: "$",
+    savingsEquation: "Value = (Probability × Downtime Impact Cost) × Downtime Reduction %",
+    requiredInputs: [],
+    assumptions: [
+      "Downtime exposure based on disaster/disruption scenarios",
+      "Value from regional redundancy and backup pools",
+      "Does not eliminate all continuity risk",
+    ],
+    presets: [
+      { label: "Conservative (20%)", value: 20 },
+      { label: "Base (35%)", value: 35 },
+      { label: "Aggressive (50%)", value: 50 },
+    ],
+  },
+}
+
+// ─── Analysis Readiness Helper ──────────────────────────────────────────────
+
+export function getLeverAnalysisReadiness(lever: Lever): AnalysisReadiness {
+  if (lever.status === "In analysis" || lever.status === "In execution") {
+    return "In analysis"
+  }
+  if (lever.dataReadiness === "Needs data") {
+    return "Needs data"
+  }
+  return "Ready"
+}
+
+export function getAnalysisReadinessColor(readiness: AnalysisReadiness): string {
+  switch (readiness) {
+    case "Ready":
+      return "bg-emerald-50 text-emerald-700 border-emerald-200"
+    case "Needs data":
+      return "bg-amber-50 text-amber-700 border-amber-200"
+    case "In analysis":
+      return "bg-sky-50 text-sky-700 border-sky-200"
+  }
+}
+
+// ─── Calculate Savings for Any Lever ────────────────────────────────────────
+
+export function calculateLeverSavings(
+  leverId: string,
+  sliderValue: number,
+  additionalInputs: Record<string, number> = {},
+): { estimatedSavings: number; savingsRate: number; breakdown: { label: string; value: number }[] } {
+  const config = leverModelConfigs[leverId]
+  if (!config) {
+    return { estimatedSavings: 0, savingsRate: 0, breakdown: [] }
+  }
+
+  const rate = sliderValue / 100
+  let coverage = 1
+  
+  // Check for coverage input
+  if (additionalInputs.coverage !== undefined) {
+    coverage = additionalInputs.coverage / 100
+  } else {
+    const coverageInput = config.requiredInputs.find(i => i.key === "coverage")
+    if (coverageInput) {
+      coverage = coverageInput.defaultValue / 100
+    }
+  }
+
+  const addressable = config.addressableBaseValue
+  const estimatedSavings = Math.round(addressable * rate * coverage)
+  const savingsRate = Math.round(rate * coverage * 100)
+
+  return {
+    estimatedSavings,
+    savingsRate,
+    breakdown: [
+      { label: config.addressableBaseLabel, value: addressable },
+      { label: "Reduction Rate", value: sliderValue },
+      { label: "Coverage", value: Math.round(coverage * 100) },
+    ],
+  }
+}
+
 // ─── Fleet-Specific Levers ──────────────────────────────────────────────────
 
 export const fleetLevers: Lever[] = [
@@ -225,7 +856,7 @@ export const fleetLevers: Lever[] = [
     ],
   },
 
-  // ─── DEMAND levers ───────────────────────────────────────────────────────
+  // ─── DEMAND levers ─────���─────────────────────────────────────────────────
   {
     id: "lev-9",
     name: "Fleet Policy Compliance + Exception Governance",

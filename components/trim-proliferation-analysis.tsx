@@ -1,10 +1,11 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
+import { Slider } from "@/components/ui/slider"
 import {
   Select,
   SelectContent,
@@ -21,6 +22,12 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
+import {
+  Tooltip as RechartsTooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import {
   BarChart,
   Bar,
@@ -46,6 +53,8 @@ import {
   Sparkles,
   BarChart3,
   TableProperties,
+  Info,
+  Save,
 } from "lucide-react"
 
 interface TrimProliferationAnalysisProps {
@@ -56,15 +65,40 @@ export function TrimProliferationAnalysis({ onBack }: TrimProliferationAnalysisP
   const [activeTab, setActiveTab] = useState("charts")
   const [savedInsights, setSavedInsights] = useState<Set<number>>(new Set())
 
-  // Savings analysis state: selected tiers + scenario
+  // Savings analysis state: selected tiers + slider
   const [selectedTiers, setSelectedTiers] = useState<Set<number>>(new Set([1, 2]))
-  const [scenario, setScenario] = useState<"conservative" | "base" | "aggressive">("base")
+  const [reductionPercent, setReductionPercent] = useState(30) // 0-100 slider value
+  const [scenarioLabel, setScenarioLabel] = useState<string>("Base")
 
-  const scenarioRates: Record<string, { label: string; rate: number }> = {
-    conservative: { label: "Conservative", rate: 0.15 },
-    base: { label: "Base", rate: 0.30 },
-    aggressive: { label: "Aggressive", rate: 0.45 },
-  }
+  // Preset scenarios for quick selection
+  const presets = [
+    { label: "Conservative", value: 15 },
+    { label: "Base", value: 30 },
+    { label: "Aggressive", value: 45 },
+  ]
+
+  // Handle slider change
+  const handleSliderChange = useCallback((values: number[]) => {
+    const newValue = values[0]
+    setReductionPercent(newValue)
+    
+    // Check if it matches a preset
+    const matchingPreset = presets.find(p => p.value === newValue)
+    if (matchingPreset) {
+      setScenarioLabel(matchingPreset.label)
+    } else {
+      setScenarioLabel(`Custom (${newValue}%)`)
+    }
+  }, [])
+
+  // Handle preset selection
+  const handlePresetSelect = useCallback((value: string) => {
+    const preset = presets.find(p => p.label.toLowerCase() === value)
+    if (preset) {
+      setReductionPercent(preset.value)
+      setScenarioLabel(preset.label)
+    }
+  }, [])
 
   const tierSummaries = useMemo(() => getTierSummaries(), [])
   const topTrims = useMemo(() => getTopPremiumTrims(), [])
@@ -74,13 +108,34 @@ export function TrimProliferationAnalysis({ onBack }: TrimProliferationAnalysisP
   const totalSpend = tierSummaries.reduce((s, t) => s + t.totalSpend, 0)
   const overallPremPct = Math.round((totalPremiumSpend / totalSpend) * 100)
 
-  // Savings calculations based on selected tiers and scenario
-  const selectedSummaries = tierSummaries.filter((t) => selectedTiers.has(t.tier))
-  const addressableSpend = selectedSummaries.reduce((s, t) => s + t.premiumSpend, 0)
-  const reductionRate = scenarioRates[scenario].rate
+  // Savings calculations based on selected tiers and slider value (real-time)
+  const selectedSummaries = useMemo(
+    () => tierSummaries.filter((t) => selectedTiers.has(t.tier)),
+    [tierSummaries, selectedTiers]
+  )
+  const addressableSpend = useMemo(
+    () => selectedSummaries.reduce((s, t) => s + t.premiumSpend, 0),
+    [selectedSummaries]
+  )
+  const reductionRate = reductionPercent / 100
   const estimatedSavings = Math.round(addressableSpend * reductionRate)
   const savingsPct = addressableSpend > 0 ? Math.round((estimatedSavings / addressableSpend) * 100) : 0
-  const premiumUnitsInScope = selectedSummaries.reduce((s, t) => s + t.premiumVehicles, 0)
+  const premiumUnitsInScope = useMemo(
+    () => selectedSummaries.reduce((s, t) => s + t.premiumVehicles, 0),
+    [selectedSummaries]
+  )
+  
+  // Calculate tier breakdown for savings
+  const tierBreakdown = useMemo(() => {
+    return selectedSummaries.map((t) => ({
+      tier: t.tier,
+      name: t.name,
+      premiumSpend: t.premiumSpend,
+      baseSpend: t.totalSpend - t.premiumSpend,
+      premiumPct: t.premiumPct,
+      savings: Math.round(t.premiumSpend * reductionRate),
+    }))
+  }, [selectedSummaries, reductionRate])
 
   // Chart data for stacked bar
   const chartData = tierSummaries.map((t) => ({
@@ -170,9 +225,9 @@ export function TrimProliferationAnalysis({ onBack }: TrimProliferationAnalysisP
         </Card>
         <Card className="shadow-none">
           <CardContent className="p-4">
-            <p className="text-xs font-medium text-muted-foreground">Est. Savings ({scenarioRates[scenario].label})</p>
+            <p className="text-xs font-medium text-muted-foreground">Est. Savings ({scenarioLabel})</p>
             <p className="text-xl font-bold text-primary mt-1">{fmt(estimatedSavings)}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">{selectedTiers.size} tier(s) in scope</p>
+            <p className="text-[10px] text-muted-foreground mt-0.5">{selectedTiers.size} tier(s), {reductionPercent}% reduction</p>
           </CardContent>
         </Card>
       </div>
@@ -392,7 +447,7 @@ export function TrimProliferationAnalysis({ onBack }: TrimProliferationAnalysisP
 
         {/* ─── Savings Analysis Tab ─────────────────────────────────────── */}
         <TabsContent value="savings" className="space-y-6 mt-4">
-          {/* Tier selector + Scenario selector */}
+          {/* Tier selector + Slider control */}
           <Card className="shadow-none">
             <CardContent className="p-5 space-y-5">
               {/* Tier selector */}
@@ -425,19 +480,81 @@ export function TrimProliferationAnalysis({ onBack }: TrimProliferationAnalysisP
 
               <Separator />
 
-              {/* Scenario selector */}
-              <div className="flex items-center gap-3">
-                <p className="text-sm font-medium text-foreground whitespace-nowrap">Reduction scenario</p>
-                <Select value={scenario} onValueChange={(v) => setScenario(v as typeof scenario)}>
-                  <SelectTrigger className="w-[200px] h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="conservative" className="text-xs">Conservative (15%)</SelectItem>
-                    <SelectItem value="base" className="text-xs">Base (30%)</SelectItem>
-                    <SelectItem value="aggressive" className="text-xs">Aggressive (45%)</SelectItem>
-                  </SelectContent>
-                </Select>
+              {/* Premium Trim Reduction Slider */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Premium trim reduction rate</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Model the savings from reducing premium trim share
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-xs bg-primary/5 text-primary border-primary/20 font-mono">
+                      {reductionPercent}%
+                    </Badge>
+                    <TooltipProvider>
+                      <RechartsTooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent side="left" className="max-w-[240px]">
+                          <p className="text-xs">Percentage of premium trim spend that will be shifted to base trims at next vehicle refresh.</p>
+                        </TooltipContent>
+                      </RechartsTooltip>
+                    </TooltipProvider>
+                  </div>
+                </div>
+                
+                {/* Slider */}
+                <div className="px-1">
+                  <Slider
+                    value={[reductionPercent]}
+                    onValueChange={handleSliderChange}
+                    min={0}
+                    max={100}
+                    step={1}
+                    className="w-full"
+                  />
+                  {/* Tick marks */}
+                  <div className="flex justify-between mt-1.5 px-0.5">
+                    {[0, 25, 50, 75, 100].map((tick) => (
+                      <button
+                        key={tick}
+                        onClick={() => handleSliderChange([tick])}
+                        className="text-[10px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                      >
+                        {tick}%
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Preset buttons */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground">Quick presets:</span>
+                  <div className="flex gap-1.5">
+                    {presets.map((preset) => (
+                      <button
+                        key={preset.label}
+                        onClick={() => handlePresetSelect(preset.label.toLowerCase())}
+                        className={cn(
+                          "px-2.5 py-1 rounded-md text-xs font-medium transition-colors",
+                          scenarioLabel === preset.label
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-muted text-muted-foreground hover:bg-muted/80",
+                        )}
+                      >
+                        {preset.label} ({preset.value}%)
+                      </button>
+                    ))}
+                  </div>
+                  {scenarioLabel.startsWith("Custom") && (
+                    <Badge variant="secondary" className="text-[10px]">
+                      {scenarioLabel}
+                    </Badge>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -456,8 +573,20 @@ export function TrimProliferationAnalysis({ onBack }: TrimProliferationAnalysisP
                   <DollarSign className="h-4 w-4 text-primary" />
                   <p className="text-sm font-semibold text-foreground">Savings Summary</p>
                   <Badge variant="outline" className="text-[10px] ml-auto bg-primary/5 text-primary border-primary/20">
-                    {scenarioRates[scenario].label} ({Math.round(reductionRate * 100)}%)
+                    {scenarioLabel} ({reductionPercent}%)
                   </Badge>
+                  <TooltipProvider>
+                    <RechartsTooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 text-muted-foreground">
+                          <Save className="h-3.5 w-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="left">
+                        <p className="text-xs">Save this scenario</p>
+                      </TooltipContent>
+                    </RechartsTooltip>
+                  </TooltipProvider>
                 </div>
                 <div className="grid grid-cols-2 gap-6 lg:grid-cols-4">
                   <div>
@@ -468,7 +597,7 @@ export function TrimProliferationAnalysis({ onBack }: TrimProliferationAnalysisP
                   <div>
                     <p className="text-xs font-medium text-muted-foreground">Estimated Savings</p>
                     <p className="text-2xl font-bold text-primary mt-1">{fmt(estimatedSavings)}</p>
-                    <p className="text-[10px] text-muted-foreground mt-0.5">Annual, at {Math.round(reductionRate * 100)}% reduction</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">Annual, at {reductionPercent}% reduction</p>
                   </div>
                   <div>
                     <p className="text-xs font-medium text-muted-foreground">Savings % of Addressable</p>
@@ -488,11 +617,16 @@ export function TrimProliferationAnalysis({ onBack }: TrimProliferationAnalysisP
           {/* Assumptions */}
           {selectedTiers.size > 0 && (
             <div className="rounded-md border bg-muted/10 p-3">
-              <p className="text-[10px] font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">Assumptions</p>
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Info className="h-3 w-3 text-muted-foreground" />
+                <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Assumptions</p>
+              </div>
               <ul className="space-y-0.5 text-[11px] text-muted-foreground leading-relaxed">
-                <li>Addressable spend = Premium spend for selected tiers</li>
-                <li>Savings = Addressable spend x premium reduction rate ({Math.round(reductionRate * 100)}%)</li>
-                <li>Default premium reduction rate = 30% (Base scenario)</li>
+                <li><span className="font-medium text-foreground">Addressable spend</span> = Premium spend for selected tiers ({selectedTiers.size} tier{selectedTiers.size > 1 ? "s" : ""})</li>
+                <li><span className="font-medium text-foreground">Estimated Savings</span> = Addressable Spend x Reduction Rate ({reductionPercent}%)</li>
+                <li><span className="font-medium text-foreground">Savings % of Addressable</span> = {savingsPct}% (equals reduction rate)</li>
+                <li>Savings realized at next vehicle refresh cycle</li>
+                <li>No constraints applied (100% of addressable is shiftable)</li>
               </ul>
             </div>
           )}
@@ -501,7 +635,12 @@ export function TrimProliferationAnalysis({ onBack }: TrimProliferationAnalysisP
           {selectedTiers.size > 0 && (
             <Card className="shadow-none">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Tier Breakdown</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm">Tier Breakdown</CardTitle>
+                  <Badge variant="secondary" className="text-[10px]">
+                    {reductionPercent}% reduction rate applied
+                  </Badge>
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 <Table>
@@ -511,45 +650,41 @@ export function TrimProliferationAnalysis({ onBack }: TrimProliferationAnalysisP
                       <TableHead className="text-right">Premium Spend</TableHead>
                       <TableHead className="text-right">Base Spend</TableHead>
                       <TableHead className="text-right">Premium %</TableHead>
-                      <TableHead className="text-right">Est. Savings ({Math.round(reductionRate * 100)}%)</TableHead>
+                      <TableHead className="text-right">Est. Savings ({reductionPercent}%)</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {selectedSummaries.map((t) => {
-                      const baseSpend = t.totalSpend - t.premiumSpend
-                      const tierSavings = Math.round(t.premiumSpend * reductionRate)
-                      return (
-                        <TableRow key={t.tier}>
-                          <TableCell className="font-medium">
-                            Tier {t.tier}: {t.name}
-                          </TableCell>
-                          <TableCell className="text-right">{fmt(t.premiumSpend)}</TableCell>
-                          <TableCell className="text-right text-muted-foreground">{fmt(baseSpend)}</TableCell>
-                          <TableCell className="text-right">
-                            <Badge
-                              variant="outline"
-                              className={cn(
-                                "text-[10px]",
-                                t.premiumPct > 40
-                                  ? "bg-red-50 text-red-700 border-red-200"
-                                  : t.premiumPct > 25
-                                    ? "bg-amber-50 text-amber-700 border-amber-200"
-                                    : "bg-emerald-50 text-emerald-700 border-emerald-200",
-                              )}
-                            >
-                              {t.premiumPct}%
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right font-semibold text-primary">{fmt(tierSavings)}</TableCell>
-                        </TableRow>
-                      )
-                    })}
+                    {tierBreakdown.map((t) => (
+                      <TableRow key={t.tier}>
+                        <TableCell className="font-medium">
+                          Tier {t.tier}: {t.name}
+                        </TableCell>
+                        <TableCell className="text-right">{fmt(t.premiumSpend)}</TableCell>
+                        <TableCell className="text-right text-muted-foreground">{fmt(t.baseSpend)}</TableCell>
+                        <TableCell className="text-right">
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              "text-[10px]",
+                              t.premiumPct > 40
+                                ? "bg-red-50 text-red-700 border-red-200"
+                                : t.premiumPct > 25
+                                  ? "bg-amber-50 text-amber-700 border-amber-200"
+                                  : "bg-emerald-50 text-emerald-700 border-emerald-200",
+                            )}
+                          >
+                            {t.premiumPct}%
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right font-semibold text-primary">{fmt(t.savings)}</TableCell>
+                      </TableRow>
+                    ))}
                     {/* Total row */}
                     <TableRow className="bg-muted/30 font-semibold">
                       <TableCell>Total</TableCell>
                       <TableCell className="text-right">{fmt(addressableSpend)}</TableCell>
                       <TableCell className="text-right text-muted-foreground">
-                        {fmt(selectedSummaries.reduce((s, t) => s + (t.totalSpend - t.premiumSpend), 0))}
+                        {fmt(tierBreakdown.reduce((s, t) => s + t.baseSpend, 0))}
                       </TableCell>
                       <TableCell className="text-right">--</TableCell>
                       <TableCell className="text-right font-bold text-primary">{fmt(estimatedSavings)}</TableCell>

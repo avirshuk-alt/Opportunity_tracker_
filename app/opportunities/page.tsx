@@ -33,6 +33,7 @@ import {
 import { cn } from "@/lib/utils"
 import { LeverDetailDrawer } from "@/components/lever-detail-drawer"
 import { TrimProliferationAnalysis } from "@/components/trim-proliferation-analysis"
+import { LeverSavingsAnalysis } from "@/components/lever-savings-analysis"
 import { getAllInsightsForCategory, type UnifiedInsight } from "@/lib/insights-adapter"
 import {
   getRecommendedLevers,
@@ -41,6 +42,9 @@ import {
   getBucketColor,
   getLeverStatusColor,
   isLeverRecommended,
+  getLeverAnalysisReadiness,
+  getAnalysisReadinessColor,
+  leverModelConfigs,
   type Lever,
   type LeverBucket,
   type LeverRecommendation,
@@ -48,6 +52,7 @@ import {
 } from "@/lib/opportunity-tracker-data"
 import {
   Beaker,
+  Calculator,
   DollarSign,
   RefreshCw,
   Search,
@@ -66,6 +71,8 @@ export default function OpportunityTrackerPage() {
   const [initiatives, setInitiatives] = useState<TrackerInitiative[]>([])
   const [refreshKey, setRefreshKey] = useState(0)
   const [showTrimAnalysis, setShowTrimAnalysis] = useState(false)
+  const [showUniversalAnalysis, setShowUniversalAnalysis] = useState(false)
+  const [analysisLever, setAnalysisLever] = useState<Lever | null>(null)
 
   // Filter state
   const [searchQuery, setSearchQuery] = useState("")
@@ -139,12 +146,36 @@ export default function OpportunityTrackerPage() {
   }, [])
 
   const handleOpenAnalysis = useCallback(
-    (analysisId: string) => {
-      // Only handle the trim proliferation analyses for now
+    (analysisId: string, lever?: Lever) => {
+      // Handle trim proliferation specially
       if (analysisId.startsWith("a-20-")) {
         setDrawerOpen(false)
         setShowTrimAnalysis(true)
+        return
       }
+      
+      // For other levers, use the universal analysis component
+      if (lever) {
+        setDrawerOpen(false)
+        setAnalysisLever(lever)
+        setShowUniversalAnalysis(true)
+      }
+    },
+    [],
+  )
+
+  // Handle direct "Analyze Savings" click from lever card
+  const handleAnalyzeSavings = useCallback(
+    (lever: Lever) => {
+      // For lev-20 (Trim Proliferation), use dedicated component
+      if (lever.id === "lev-20") {
+        setShowTrimAnalysis(true)
+        return
+      }
+      
+      // For all other levers, use universal analysis
+      setAnalysisLever(lever)
+      setShowUniversalAnalysis(true)
     },
     [],
   )
@@ -164,6 +195,31 @@ export default function OpportunityTrackerPage() {
           description="Premium vs base trim analysis by role tier with interactive savings model"
         />
         <TrimProliferationAnalysis onBack={() => setShowTrimAnalysis(false)} />
+      </>
+    )
+  }
+
+  // If universal analysis is open for any other lever
+  if (showUniversalAnalysis && analysisLever) {
+    return (
+      <>
+        <PageHeader
+          crumbs={[
+            { label: "Home", href: "/" },
+            { label: selectedCategory.name, href: "/" },
+            { label: "Opportunity Tracker", href: "/opportunities" },
+            { label: analysisLever.name },
+          ]}
+          title={`Analysis: ${analysisLever.name}`}
+          description={analysisLever.description}
+        />
+        <LeverSavingsAnalysis 
+          lever={analysisLever} 
+          onBack={() => {
+            setShowUniversalAnalysis(false)
+            setAnalysisLever(null)
+          }} 
+        />
       </>
     )
   }
@@ -299,6 +355,7 @@ export default function OpportunityTrackerPage() {
                     recommendation={rec}
                     availableAnalyses={availableCount}
                     onClick={() => openLeverDrawer(lever)}
+                    onAnalyzeSavings={() => handleAnalyzeSavings(lever)}
                   />
                 )
               })}
@@ -379,8 +436,9 @@ export default function OpportunityTrackerPage() {
           setDrawerRecommendation(null)
         }}
         onCreateInitiative={handleCreateInitiative}
-        onOpenAnalysis={handleOpenAnalysis}
+        onOpenAnalysis={(analysisId) => handleOpenAnalysis(analysisId, selectedLever ?? undefined)}
         onRefreshRecommendation={() => setRefreshKey((k) => k + 1)}
+        onAnalyzeSavings={selectedLever ? () => handleAnalyzeSavings(selectedLever) : undefined}
       />
     </TooltipProvider>
   )
@@ -393,26 +451,29 @@ function PlacematLeverCard({
   recommendation,
   availableAnalyses,
   onClick,
+  onAnalyzeSavings,
 }: {
   lever: Lever
   recommendation: LeverRecommendation | undefined
   availableAnalyses: number
   onClick: () => void
+  onAnalyzeSavings: () => void
 }) {
   const isRecommended = !!recommendation
+  const readiness = getLeverAnalysisReadiness(lever)
+  const hasModelConfig = !!leverModelConfigs[lever.id]
 
   const card = (
     <Card
       className={cn(
-        "cursor-pointer transition-all hover:shadow-md shadow-none",
+        "transition-all hover:shadow-md shadow-none",
         isRecommended
           ? "ring-2 ring-primary/40 hover:ring-primary/60"
           : "hover:border-primary/30",
       )}
-      onClick={onClick}
     >
       <CardContent className="p-3">
-        <div className="flex items-start justify-between gap-1.5 mb-1.5">
+        <div className="flex items-start justify-between gap-1.5 mb-1.5 cursor-pointer" onClick={onClick}>
           <Badge variant="outline" className={cn("text-[10px] h-4", getLeverStatusColor(lever.status))}>
             {lever.status}
           </Badge>
@@ -423,22 +484,39 @@ function PlacematLeverCard({
             </Badge>
           )}
         </div>
-        <h4 className="text-xs font-semibold text-foreground leading-tight mb-1">
-          {lever.name}
-        </h4>
-        <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2 mb-2">
-          {lever.description}
-        </p>
-        <div className="flex items-center gap-2">
-          <Badge variant="secondary" className="text-[10px] h-4 gap-0.5">
-            <Beaker className="h-2.5 w-2.5" />
-            {availableAnalyses} analyses
-          </Badge>
-          {lever.dataReadiness === "Needs data" && (
-            <Badge variant="outline" className="text-[10px] h-4 bg-amber-50 text-amber-700 border-amber-200">
-              Needs data
+        <div className="cursor-pointer" onClick={onClick}>
+          <h4 className="text-xs font-semibold text-foreground leading-tight mb-1">
+            {lever.name}
+          </h4>
+          <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2 mb-2">
+            {lever.description}
+          </p>
+        </div>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className={cn("text-[10px] h-4", getAnalysisReadinessColor(readiness))}>
+              {readiness}
             </Badge>
-          )}
+            <Badge variant="secondary" className="text-[10px] h-4 gap-0.5">
+              <Beaker className="h-2.5 w-2.5" />
+              {availableAnalyses}
+            </Badge>
+          </div>
+          <Button
+            variant={hasModelConfig ? "default" : "outline"}
+            size="sm"
+            className={cn(
+              "h-5 text-[10px] px-2 gap-1",
+              !hasModelConfig && "bg-transparent"
+            )}
+            onClick={(e) => {
+              e.stopPropagation()
+              onAnalyzeSavings()
+            }}
+          >
+            <Calculator className="h-2.5 w-2.5" />
+            Analyze
+          </Button>
         </div>
       </CardContent>
     </Card>
